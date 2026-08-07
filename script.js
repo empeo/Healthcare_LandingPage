@@ -18,7 +18,8 @@ document.addEventListener('DOMContentLoaded', () => {
       loader.classList.add('hide');
       document.body.style.overflow = '';
       animateStats();
-    }, 800);
+      triggerScrollReveals();
+    }, 700);
   };
 
   document.body.style.overflow = 'hidden';
@@ -29,23 +30,63 @@ document.addEventListener('DOMContentLoaded', () => {
     setTimeout(finishLoading, 2000);
   }
 
+  /* ---------- SCROLL REVEAL OBSERVER (Fade in / Slide up) ---------- */
+  const revealElements = document.querySelectorAll('.reveal');
+
+  const revealObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('active');
+      } else {
+        const rect = entry.target.getBoundingClientRect();
+        if (rect.top > window.innerHeight || rect.bottom < 0) {
+          entry.target.classList.remove('active');
+        }
+      }
+    });
+  }, {
+    threshold: 0.1,
+    rootMargin: '0px 0px -20px 0px'
+  });
+
+  revealElements.forEach(el => revealObserver.observe(el));
+
+  function triggerScrollReveals() {
+    revealElements.forEach(el => {
+      const rect = el.getBoundingClientRect();
+      if (rect.top < window.innerHeight - 20) {
+        el.classList.add('active');
+      }
+    });
+  }
+
+  window.addEventListener('scroll', triggerScrollReveals, { passive: true });
+
   /* ---------- MULTI-PAGE ROUTE TRANSITION SYSTEM ---------- */
   const journeyTransition = document.getElementById('journeyTransition');
   const jtText = document.getElementById('jtText');
   const viewSections = document.querySelectorAll('.view-section');
   const navRouteLinks = document.querySelectorAll('.nav-route');
+  const bookingServiceTitle = document.getElementById('bookingServiceTitle');
+  const patientNameInput = document.getElementById('patientName');
+
+  let currentSelectedService = 'طلب زيارة تمريضية عامة';
 
   const routeTitles = {
     home: 'الرئيسية | مسار الرعاية',
     services: 'موسوعة الخدمات الـ 14 المتاحة',
-    about: 'مسار التمريض والرعاية الطبية',
-    contact: 'تواصل مباشر مع الطقم الطبي'
+    about: 'عن مؤسسة التميز للرعاية',
+    contact: 'تواصل معنا وحجز زيارة منزلية'
   };
 
-  function switchRoute(targetRoute) {
+  function switchRoute(targetRoute, serviceName) {
     if (!targetRoute) return;
 
-    // Show transition overlay
+    if (serviceName) {
+      currentSelectedService = serviceName;
+      if (bookingServiceTitle) bookingServiceTitle.textContent = currentSelectedService;
+    }
+
     if (jtText && routeTitles[targetRoute]) {
       jtText.textContent = `جاري الانتقال إلى: ${routeTitles[targetRoute]}...`;
     }
@@ -66,13 +107,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
       window.scrollTo({ top: 0, behavior: 'smooth' });
 
-      // Hide transition overlay
       setTimeout(() => {
         journeyTransition.classList.remove('active');
+        triggerScrollReveals();
+        if (targetRoute === 'contact' && serviceName && patientNameInput) {
+          const formBox = document.getElementById('contactBookingBox');
+          if (formBox) formBox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          patientNameInput.focus();
+        }
       }, 300);
     }, 450);
   }
 
+  // Top and Mobile navigation route links
   navRouteLinks.forEach(link => {
     link.addEventListener('click', (e) => {
       e.preventDefault();
@@ -81,47 +128,21 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  /* ---------- INTERACTIVE BOOKING MODAL & WHATSAPP FORM ---------- */
-  const bookingModal = document.getElementById('bookingModal');
-  const modalCloseBtn = document.getElementById('modalCloseBtn');
-  const modalServiceTitle = document.getElementById('modalServiceTitle');
-  const modalServiceBadge = document.getElementById('modalServiceBadge');
-  const whatsappBookingForm = document.getElementById('whatsappBookingForm');
-
-  let currentSelectedService = 'طلب خدمة تمريضية عامة';
-
-  function openBookingModal(serviceName) {
-    currentSelectedService = serviceName || 'طلب خدمة تمريضية عامة';
-    if (modalServiceTitle) modalServiceTitle.textContent = currentSelectedService;
-    if (modalServiceBadge) modalServiceBadge.textContent = 'خدمة محددة جاهزة للحجز';
-    
-    bookingModal.classList.add('active');
-  }
-
-  function closeBookingModal() {
-    bookingModal.classList.remove('active');
-  }
-
+  // Open contact view & pre-fill service for any booking button
   document.addEventListener('click', (e) => {
     const btn = e.target.closest('.open-booking-btn');
     if (btn) {
       e.preventDefault();
-      e.stopPropagation();
       const serviceName = btn.dataset.service || btn.getAttribute('data-service');
-      openBookingModal(serviceName);
+      switchRoute('contact', serviceName);
     }
   });
 
-  if (modalCloseBtn) modalCloseBtn.addEventListener('click', closeBookingModal);
-  if (bookingModal) {
-    bookingModal.addEventListener('click', (e) => {
-      if (e.target === bookingModal) closeBookingModal();
-    });
-  }
+  /* ---------- WHATSAPP BOOKING FORM SUBMISSION ---------- */
+  const whatsappBookingFormPage = document.getElementById('whatsappBookingFormPage');
 
-  // Handle Form Submission -> Construct Structured WhatsApp Message
-  if (whatsappBookingForm) {
-    whatsappBookingForm.addEventListener('submit', (e) => {
+  if (whatsappBookingFormPage) {
+    whatsappBookingFormPage.addEventListener('submit', (e) => {
       e.preventDefault();
 
       const name = document.getElementById('patientName').value.trim();
@@ -146,7 +167,6 @@ document.addEventListener('DOMContentLoaded', () => {
       const encodedMsg = encodeURIComponent(messageText);
       const whatsappUrl = `https://wa.me/201113482494?text=${encodedMsg}`;
 
-      closeBookingModal();
       window.open(whatsappUrl, '_blank');
     });
   }
@@ -169,6 +189,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (matchesCat && matchesSearch) {
         card.style.display = 'flex';
+        card.classList.add('active');
       } else {
         card.style.display = 'none';
       }
@@ -237,10 +258,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const centerX = rect.width / 2;
       const centerY = rect.height / 2;
 
-      const rotateX = ((y - centerY) / centerY) * -5;
-      const rotateY = ((x - centerX) / centerX) * 5;
+      const rotateX = ((y - centerY) / centerY) * -4;
+      const rotateY = ((x - centerX) / centerX) * 4;
 
-      card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateY(-6px)`;
+      card.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) translateY(-4px)`;
     });
 
     card.addEventListener('mouseleave', () => {
